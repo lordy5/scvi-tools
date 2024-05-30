@@ -763,14 +763,15 @@ class VAE(EmbeddingModuleMixin, BaseMinifiedModeModuleClass):
         mode: Literal["normal", "fast"],
     ) -> torch.Tensor:
         batches = torch.unique(batch_indices)
+        mmd_loss = 0
         for batch_0, batch_1 in zip(batches, batches[1:]):
             z_0 = z[(batch_indices == batch_0).reshape(-1)]
             z_1 = z[(batch_indices == batch_1).reshape(-1)]
             if mode == "normal":
-                self._compute_mmd(z_0, z_1)
+                mmd_loss += self._compute_mmd(z_0, z_1)
             elif mode == "fast":
-                self._compute_fast_mmd(z_0, z_1)
-        ...
+                mmd_loss += self._compute_fast_mmd(z_0, z_1)
+        return torch.Tensor(mmd_loss)
 
 
 class LDVAE(VAE):
