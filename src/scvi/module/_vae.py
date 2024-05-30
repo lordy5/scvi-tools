@@ -165,6 +165,7 @@ class VAE(EmbeddingModuleMixin, BaseMinifiedModeModuleClass):
         extra_encoder_kwargs: dict | None = None,
         extra_decoder_kwargs: dict | None = None,
         batch_embedding_kwargs: dict | None = None,
+        # mode: Literal["normal", "fast"] = "normal",
     ):
         from scvi.nn import DecoderSCVI, Encoder
 
@@ -702,6 +703,74 @@ class VAE(EmbeddingModuleMixin, BaseMinifiedModeModuleClass):
         else:
             batch_log_lkl = batch_log_lkl.cpu()
         return batch_log_lkl
+
+    def gaussian_kernel(
+        self,
+        x: torch.Tensor,
+        y: torch.Tensor,
+    ) -> torch.Tensor:
+        x_expanded = x.expand(x.shape[0], y.shape[0], x.shape[1], x.shape[2])
+        y_expanded = y.expand(x.shape[0], y.shape[0], x.shape[1], x.shape[2])
+        diff = x_expanded - y_expanded
+        return torch.exp(-torch.norm(diff, dim=(2, 3)).pow(2))
+
+    # not vectorized. used for fast mmd
+    # x, y are single samples
+    def kernel_single(
+        self,
+        x: torch.Tensor,
+        y: torch.Tensor,
+    ) -> int:
+        return torch.exp(-torch.norm(x - y).pow(2))
+
+    def _compute_mmd(
+        self,
+        z1: torch.Tensor,
+        z2: torch.Tensor,
+    ) -> int:
+        return (
+            self.gaussian_kernel(z1, z1).mean()
+            - 2 * self.gaussian_kernel(z1, z2).mean()
+            + self.gaussian_kernel(z2, z2).mean()
+        )
+
+    def _compute_fast_mmd(
+        self,
+        z1: torch.Tensor,
+        z2: torch.Tensor,
+    ) -> int:
+        m = min(z1.size(dim=0), z2.size(dim=1))
+        m2 = torch.floor(m / 2)
+        m = m2 * 2  # We want an even number of cells
+        # only use the first m samples of each batch,
+        # where m is the number of samples in the smaller batch
+        z1 = z1[:m]
+        z2 = z2[:m]
+
+        sum = 0
+        for i in range(1, m2 + 1):
+            sum += self.kernel_single(z1[2 * i - 1], z1[2 * i])
+            sum += self.kernel_single(z2[2 * i - 1], z2[2 * i])
+            sum -= self.kernel_single(z1[2 * i - 1], z2[2 * i])
+            sum -= self.kernel_single(z1[2 * i], z2[2 * i - 1])
+
+        return sum / m2
+
+    def _compute_mmd_loss(
+        self,
+        z: torch.Tensor,
+        batch_indices: torch.Tensor,
+        mode: Literal["normal", "fast"],
+    ) -> torch.Tensor:
+        batches = torch.unique(batch_indices)
+        for batch_0, batch_1 in zip(batches, batches[1:]):
+            z_0 = z[(batch_indices == batch_0).reshape(-1)]
+            z_1 = z[(batch_indices == batch_1).reshape(-1)]
+            if mode == "normal":
+                self._compute_mmd(z_0, z_1)
+            elif mode == "fast":
+                self._compute_fast_mmd(z_0, z_1)
+        ...
 
 
 class LDVAE(VAE):
