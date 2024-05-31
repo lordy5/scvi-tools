@@ -87,6 +87,8 @@ class LossOutput:
     kl_local_sum: Tensor = field(default=None)
     kl_global_sum: Tensor = field(default=None)
 
+    mmd: LossRecord | None = None
+
     def __post_init__(self):
         object.__setattr__(self, "loss", self.dict_sum(self.loss))
 

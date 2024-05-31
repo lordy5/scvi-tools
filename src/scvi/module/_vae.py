@@ -140,6 +140,7 @@ class VAE(EmbeddingModuleMixin, BaseMinifiedModeModuleClass):
     def __init__(
         self,
         n_input: int,
+        beta: int,
         n_batch: int = 0,
         n_labels: int = 0,
         n_hidden: int = 128,
@@ -165,11 +166,14 @@ class VAE(EmbeddingModuleMixin, BaseMinifiedModeModuleClass):
         extra_encoder_kwargs: dict | None = None,
         extra_decoder_kwargs: dict | None = None,
         batch_embedding_kwargs: dict | None = None,
-        # mode: Literal["normal", "fast"] = "normal",
+        mode: Literal["normal", "fast"] = "normal",
     ):
         from scvi.nn import DecoderSCVI, Encoder
 
         super().__init__()
+
+        self.mmd_mode = mode
+        self.beta = beta
 
         self.dispersion = dispersion
         self.n_latent = n_latent
@@ -561,7 +565,11 @@ class VAE(EmbeddingModuleMixin, BaseMinifiedModeModuleClass):
 
         weighted_kl_local = kl_weight * kl_local_for_warmup + kl_local_no_warmup
 
-        loss = torch.mean(reconst_loss + weighted_kl_local)
+        mmd_loss = self._compute_mmd_loss(
+            MODULE_KEYS.Z_KEY, MODULE_KEYS.BATCH_INDEX_KEY, self.mmd_mode
+        )
+
+        loss = torch.mean(reconst_loss + weighted_kl_local) + self.beta * mmd_loss
 
         return LossOutput(
             loss=loss,
@@ -570,6 +578,7 @@ class VAE(EmbeddingModuleMixin, BaseMinifiedModeModuleClass):
                 MODULE_KEYS.KL_L_KEY: kl_divergence_l,
                 MODULE_KEYS.KL_Z_KEY: kl_divergence_z,
             },
+            mmd=mmd_loss,
         )
 
     @torch.inference_mode()
