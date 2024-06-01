@@ -175,6 +175,7 @@ class VAE(EmbeddingModuleMixin, BaseMinifiedModeModuleClass):
 
         self.mmd_mode = mode
         self.beta = beta
+        self.mmd = mmd
 
         self.dispersion = dispersion
         self.n_latent = n_latent
