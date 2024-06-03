@@ -569,7 +569,9 @@ class VAE(EmbeddingModuleMixin, BaseMinifiedModeModuleClass):
 
         if self.mmd:
             mmd_loss = self._compute_mmd_loss(
-                MODULE_KEYS.Z_KEY, MODULE_KEYS.BATCH_INDEX_KEY, self.mmd_mode
+                inference_outputs[MODULE_KEYS.Z_KEY],
+                tensors[REGISTRY_KEYS.BATCH_KEY],
+                self.mmd_mode,
             )
         else:
             mmd_loss = 0
@@ -723,10 +725,12 @@ class VAE(EmbeddingModuleMixin, BaseMinifiedModeModuleClass):
         x: torch.Tensor,
         y: torch.Tensor,
     ) -> torch.Tensor:
-        x_expanded = x.expand(x.shape[0], y.shape[0], x.shape[1], x.shape[2])
-        y_expanded = y.expand(x.shape[0], y.shape[0], x.shape[1], x.shape[2])
+        x_expanded = x.unsqueeze(1)  # add source
+        y_expanded = y.unsqueeze(0)
+        x_expanded = x.expand(x.shape[0], y.shape[0], x.size[1])
+        y_expanded = y.expand(x.shape[0], y.shape[0], x.size[1])
         diff = x_expanded - y_expanded
-        return torch.exp(-torch.norm(diff, dim=(2, 3)).pow(2))
+        return torch.exp(-torch.linalg.vector_norm(diff, dim=2).pow(2))
 
     # not vectorized. used for fast mmd
     # x, y are single samples
@@ -735,7 +739,7 @@ class VAE(EmbeddingModuleMixin, BaseMinifiedModeModuleClass):
         x: torch.Tensor,
         y: torch.Tensor,
     ) -> int:
-        return torch.exp(-torch.norm(x - y).pow(2))
+        return torch.exp(-torch.linalg.vector_norm(x - y).pow(2))
 
     def _compute_mmd(
         self,
@@ -753,7 +757,7 @@ class VAE(EmbeddingModuleMixin, BaseMinifiedModeModuleClass):
         z1: torch.Tensor,
         z2: torch.Tensor,
     ) -> int:
-        m = min(z1.size(dim=0), z2.size(dim=1))
+        m = min(z1.size(dim=0), z2.size(dim=0))
         m2 = torch.floor(m / 2)
         m = m2 * 2  # We want an even number of cells
         # only use the first m samples of each batch,
