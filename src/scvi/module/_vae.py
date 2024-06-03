@@ -727,8 +727,8 @@ class VAE(EmbeddingModuleMixin, BaseMinifiedModeModuleClass):
     ) -> torch.Tensor:
         x_expanded = x.unsqueeze(1)  # add source
         y_expanded = y.unsqueeze(0)
-        x_expanded = x.expand(x.shape[0], y.shape[0], x.size[1])
-        y_expanded = y.expand(x.shape[0], y.shape[0], x.size[1])
+        x_expanded = x.expand(x.shape[0], y.shape[0], x.size(dim=1))
+        y_expanded = y.expand(x.shape[0], y.shape[0], x.size(dim=1))
         diff = x_expanded - y_expanded
         return torch.exp(-torch.linalg.vector_norm(diff, dim=2).pow(2))
 
