@@ -140,7 +140,7 @@ class VAE(EmbeddingModuleMixin, BaseMinifiedModeModuleClass):
     def __init__(
         self,
         n_input: int,
-        beta: int,
+        beta: int = 0,
         n_batch: int = 0,
         n_labels: int = 0,
         n_hidden: int = 128,
