@@ -732,14 +732,13 @@ class VAE(EmbeddingModuleMixin, BaseMinifiedModeModuleClass):
         diff = x_expanded - y_expanded
         return torch.exp(-torch.linalg.vector_norm(diff, dim=2).pow(2))
 
-    # not vectorized. used for fast mmd
-    # x, y are single samples
-    def kernel_single(
+    # used for fast mmd, does vector computation of gaussian kernel
+    def kernel_fast(
         self,
         x: torch.Tensor,
         y: torch.Tensor,
-    ) -> int:
-        return torch.exp(-torch.linalg.vector_norm(x - y).pow(2))
+    ) -> torch.Tensor:
+        return torch.exp(-torch.linalg.vector_norm(x - y, dim=1).pow(2))
 
     def _compute_mmd(
         self,
@@ -769,14 +768,17 @@ class VAE(EmbeddingModuleMixin, BaseMinifiedModeModuleClass):
         z1 = z1[:m]
         z2 = z2[:m]
 
-        sum = 0
-        for i in range(1, m2 + 1):
-            sum += self.kernel_single(z1[2 * i - 2], z1[2 * i - 1])
-            sum += self.kernel_single(z2[2 * i - 2], z2[2 * i - 1])
-            sum -= self.kernel_single(z1[2 * i - 2], z2[2 * i - 1])
-            sum -= self.kernel_single(z1[2 * i - 1], z2[2 * i - 2])
+        z1_even, z1_odd = z1[::2], z1[1::2]  # samples at odd and even indices
+        z2_even, z2_odd = z2[::2], z2[1::2]
 
-        return sum / m2
+        h = (
+            self.kernel_fast(z1_even, z1_odd)
+            + self.kernel_fast(z2_even, z2_odd)
+            - self.kernel_fast(z1_even, z2_odd)
+            - self.kernel_fast(z1_odd, z2_even)
+        )
+
+        return h.mean()
 
     def _compute_mmd_loss(
         self,
