@@ -759,6 +759,10 @@ class VAE(EmbeddingModuleMixin, BaseMinifiedModeModuleClass):
     ) -> int:
         m = min(z1.size(dim=0), z2.size(dim=0))
         m2 = m // 2
+
+        if m2 == 0:
+            return 0
+
         m = m2 * 2  # We want an even number of cells
         # only use the first m samples of each batch,
         # where m is the number of samples in the smaller batch
