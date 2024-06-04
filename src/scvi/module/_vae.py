@@ -758,7 +758,7 @@ class VAE(EmbeddingModuleMixin, BaseMinifiedModeModuleClass):
         z2: torch.Tensor,
     ) -> int:
         m = min(z1.size(dim=0), z2.size(dim=0))
-        m2 = torch.floor(m / 2)
+        m2 = m // 2
         m = m2 * 2  # We want an even number of cells
         # only use the first m samples of each batch,
         # where m is the number of samples in the smaller batch
