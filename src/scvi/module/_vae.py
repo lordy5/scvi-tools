@@ -767,10 +767,10 @@ class VAE(EmbeddingModuleMixin, BaseMinifiedModeModuleClass):
 
         sum = 0
         for i in range(1, m2 + 1):
-            sum += self.kernel_single(z1[2 * i - 1], z1[2 * i])
-            sum += self.kernel_single(z2[2 * i - 1], z2[2 * i])
-            sum -= self.kernel_single(z1[2 * i - 1], z2[2 * i])
-            sum -= self.kernel_single(z1[2 * i], z2[2 * i - 1])
+            sum += self.kernel_single(z1[2 * i - 2], z1[2 * i - 1])
+            sum += self.kernel_single(z2[2 * i - 2], z2[2 * i - 1])
+            sum -= self.kernel_single(z1[2 * i - 2], z2[2 * i - 1])
+            sum -= self.kernel_single(z1[2 * i - 1], z2[2 * i - 2])
 
         return sum / m2
 
