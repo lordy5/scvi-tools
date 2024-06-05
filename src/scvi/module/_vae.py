@@ -731,15 +731,17 @@ class VAE(EmbeddingModuleMixin, BaseMinifiedModeModuleClass):
         x: torch.Tensor,
         y: torch.Tensor,
     ) -> torch.Tensor:
-        """Compute gaussian kernel between every pair of samples from x and y"""
-        x_expanded = x.unsqueeze(1)  # add source
+        """Compute gaussian kernel between every pair of samples from x and y.
+
+        Method based on compute_kernel method from https://github.com/napsternxg/pytorch-practice/blob/master/Pytorch%20-%20MMD%20VAE.ipynb
+        """
+        x_expanded = x.unsqueeze(1)
         y_expanded = y.unsqueeze(0)
         x_expanded = x_expanded.expand(x.shape[0], y.shape[0], x.size(dim=1))
         y_expanded = y_expanded.expand(x.shape[0], y.shape[0], x.size(dim=1))
         diff = x_expanded - y_expanded
         return torch.exp(-torch.linalg.vector_norm(diff, dim=2).pow(2))
 
-    # used for fast mmd, does vector computation of gaussian kernel
     def kernel_fast(
         self,
         x: torch.Tensor,
