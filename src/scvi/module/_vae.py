@@ -573,7 +573,7 @@ class VAE(EmbeddingModuleMixin, BaseMinifiedModeModuleClass):
 
         weighted_kl_local = kl_weight * kl_local_for_warmup + kl_local_no_warmup
 
-        if self.mmd:
+        if self.mmd and self.beta != 0:
             mmd_loss = self._compute_mmd_loss(
                 inference_outputs[MODULE_KEYS.Z_KEY],
                 tensors[REGISTRY_KEYS.BATCH_KEY],
