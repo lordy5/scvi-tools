@@ -28,6 +28,8 @@ class VAE(EmbeddingModuleMixin, BaseMinifiedModeModuleClass):
     ----------
     n_input
         Number of input features.
+    beta
+        Coefficient of mmd loss when computing total loss
     n_batch
         Number of batches. If ``0``, no batch correction is performed.
     n_labels
@@ -131,6 +133,10 @@ class VAE(EmbeddingModuleMixin, BaseMinifiedModeModuleClass):
     batch_embedding_kwargs
         Keyword arguments passed into :class:`~scvi.nn.Embedding` if ``batch_representation`` is
         set to ``"embedding"``.
+    mode
+        Determines if normal or fast version of mmd computation is used.
+    mmd
+        If ``True``, mmd version of model is used, otherwise normal version is used.
 
     Notes
     -----
@@ -725,6 +731,7 @@ class VAE(EmbeddingModuleMixin, BaseMinifiedModeModuleClass):
         x: torch.Tensor,
         y: torch.Tensor,
     ) -> torch.Tensor:
+        """Compute gaussian kernel between every pair of samples from x and y"""
         x_expanded = x.unsqueeze(1)  # add source
         y_expanded = y.unsqueeze(0)
         x_expanded = x_expanded.expand(x.shape[0], y.shape[0], x.size(dim=1))
@@ -738,6 +745,7 @@ class VAE(EmbeddingModuleMixin, BaseMinifiedModeModuleClass):
         x: torch.Tensor,
         y: torch.Tensor,
     ) -> torch.Tensor:
+        """Compute vectorized gaussian kernel, evaluated at corresponding samples in x and y"""
         return torch.exp(-torch.linalg.vector_norm(x - y, dim=1).pow(2))
 
     def _compute_mmd(
@@ -745,6 +753,7 @@ class VAE(EmbeddingModuleMixin, BaseMinifiedModeModuleClass):
         z1: torch.Tensor,
         z2: torch.Tensor,
     ) -> int:
+        """Compute the mmd for two sets of samples"""
         return (
             self.gaussian_kernel(z1, z1).mean()
             - 2 * self.gaussian_kernel(z1, z2).mean()
@@ -756,6 +765,7 @@ class VAE(EmbeddingModuleMixin, BaseMinifiedModeModuleClass):
         z1: torch.Tensor,
         z2: torch.Tensor,
     ) -> int:
+        """Compute fast approximation of mmd for two sets of samples"""
         m = min(z1.size(dim=0), z2.size(dim=0))
         m2 = m // 2
 
@@ -786,6 +796,7 @@ class VAE(EmbeddingModuleMixin, BaseMinifiedModeModuleClass):
         batch_indices: torch.Tensor,
         mode: Literal["normal", "fast"],
     ) -> torch.Tensor:
+        """Compute the mmd loss, only computing the mmd between sequential batches"""
         batches = torch.unique(batch_indices)
         mmd_loss = 0
         for batch_0, batch_1 in zip(batches, batches[1:]):
