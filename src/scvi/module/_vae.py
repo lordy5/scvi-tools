@@ -789,7 +789,6 @@ class VAE(EmbeddingModuleMixin, BaseMinifiedModeModuleClass):
             - self.kernel_fast(z1_even, z2_odd)
             - self.kernel_fast(z1_odd, z2_even)
         )
-        print("mmd shape:", h.mean().shape)
         return h.mean()
 
     def _compute_mmd_loss(

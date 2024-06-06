@@ -62,6 +62,8 @@ class LossOutput:
     n_obs_minibatch
         Number of observations in the minibatch. If None, will be inferred from
         the shape of the reconstruction_loss tensor.
+    mmd
+        mmd loss term.
 
 
     Examples
