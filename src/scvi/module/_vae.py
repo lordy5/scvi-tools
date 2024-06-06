@@ -173,7 +173,7 @@ class VAE(EmbeddingModuleMixin, BaseMinifiedModeModuleClass):
         extra_decoder_kwargs: dict | None = None,
         batch_embedding_kwargs: dict | None = None,
         mode: Literal["normal", "fast"] = "normal",
-        mmd: bool = False,  # should mmd loss be added to the loss function
+        mmd: bool = False,
     ):
         from scvi.nn import DecoderSCVI, Encoder
 
