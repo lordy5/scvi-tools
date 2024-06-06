@@ -24,7 +24,7 @@ def test_scvi_mmd():
     model4.get_latent_representation()
 
     # check if mmd loss is recorded
-    assert len(model1.history["mmd"]) == 5
-    assert len(model2.history["mmd"]) == 5
-    assert len(model3.history["mmd"]) == 5
-    assert len(model4.history["mmd"]) == 5
+    assert len(model1.history["mmd_train"]) == 5
+    assert len(model2.history["mmd_train"]) == 5
+    assert len(model3.history["mmd_train"]) == 5
+    assert len(model4.history["mmd_train"]) == 5
