@@ -77,7 +77,7 @@ class LossOutput:
     """
 
     loss: LossRecord
-    mmd: LossRecord
+    # mmd: LossRecord
     reconstruction_loss: LossRecord | None = None
     kl_local: LossRecord | None = None
     kl_global: LossRecord | None = None
@@ -92,7 +92,6 @@ class LossOutput:
 
     def __post_init__(self):
         object.__setattr__(self, "loss", self.dict_sum(self.loss))
-        object.__setattr__(self, "mmd", self._as_dict("mmd"))
 
         if self.n_obs_minibatch is None and self.reconstruction_loss is None:
             raise ValueError("Must provide either n_obs_minibatch or reconstruction_loss")
