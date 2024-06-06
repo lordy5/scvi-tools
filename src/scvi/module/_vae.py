@@ -772,7 +772,7 @@ class VAE(EmbeddingModuleMixin, BaseMinifiedModeModuleClass):
         m2 = m // 2
 
         if m2 == 0:
-            return torch.Tensor(0)
+            return 0
 
         m = m2 * 2  # We want an even number of cells
         # only use the first m samples of each batch,
@@ -799,7 +799,7 @@ class VAE(EmbeddingModuleMixin, BaseMinifiedModeModuleClass):
     ) -> torch.Tensor:
         """Compute the mmd loss, only computing the mmd between sequential batches"""
         batches = torch.unique(batch_indices)
-        mmd_loss = torch.Tensor(0)
+        mmd_loss = 0
         for batch_0, batch_1 in zip(batches, batches[1:]):
             z_0 = z[(batch_indices == batch_0).reshape(-1)]
             z_1 = z[(batch_indices == batch_1).reshape(-1)]
