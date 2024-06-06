@@ -807,6 +807,7 @@ class VAE(EmbeddingModuleMixin, BaseMinifiedModeModuleClass):
                 mmd_loss += self._compute_mmd(z_0, z_1)
             elif mode == "fast":
                 mmd_loss += self._compute_fast_mmd(z_0, z_1)
+        print(mmd_loss)
         return torch.Tensor(mmd_loss)
 
 
