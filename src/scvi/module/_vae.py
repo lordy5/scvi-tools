@@ -591,7 +591,8 @@ class VAE(EmbeddingModuleMixin, BaseMinifiedModeModuleClass):
                 MODULE_KEYS.KL_L_KEY: kl_divergence_l,
                 MODULE_KEYS.KL_Z_KEY: kl_divergence_z,
             },
-            mmd=mmd_loss,
+            # mmd=mmd_loss,
+            extra_metrics={"mmd": mmd_loss},
         )
 
     @torch.inference_mode()
