@@ -28,6 +28,8 @@ class VAE(EmbeddingModuleMixin, BaseMinifiedModeModuleClass):
     ----------
     n_input
         Number of input features.
+    beta
+        Coefficient of mmd loss when computing total loss
     n_batch
         Number of batches. If ``0``, no batch correction is performed.
     n_labels
@@ -131,6 +133,10 @@ class VAE(EmbeddingModuleMixin, BaseMinifiedModeModuleClass):
     batch_embedding_kwargs
         Keyword arguments passed into :class:`~scvi.nn.Embedding` if ``batch_representation`` is
         set to ``"embedding"``.
+    mode
+        Determines if normal or fast version of mmd computation is used.
+    mmd
+        If ``True``, mmd version of model is used, otherwise normal version is used.
 
     Notes
     -----
@@ -140,6 +146,7 @@ class VAE(EmbeddingModuleMixin, BaseMinifiedModeModuleClass):
     def __init__(
         self,
         n_input: int,
+        beta: int = 0,
         n_batch: int = 0,
         n_labels: int = 0,
         n_hidden: int = 128,
@@ -165,10 +172,16 @@ class VAE(EmbeddingModuleMixin, BaseMinifiedModeModuleClass):
         extra_encoder_kwargs: dict | None = None,
         extra_decoder_kwargs: dict | None = None,
         batch_embedding_kwargs: dict | None = None,
+        mode: Literal["normal", "fast"] = "normal",
+        mmd: bool = False,
     ):
         from scvi.nn import DecoderSCVI, Encoder
 
         super().__init__()
+
+        self.mmd_mode = mode
+        self.beta = beta
+        self.mmd = mmd
 
         self.dispersion = dispersion
         self.n_latent = n_latent
@@ -560,7 +573,16 @@ class VAE(EmbeddingModuleMixin, BaseMinifiedModeModuleClass):
 
         weighted_kl_local = kl_weight * kl_local_for_warmup + kl_local_no_warmup
 
-        loss = torch.mean(reconst_loss + weighted_kl_local)
+        if self.mmd and self.beta != 0:
+            mmd_loss = self._compute_mmd_loss(
+                inference_outputs[MODULE_KEYS.Z_KEY],
+                tensors[REGISTRY_KEYS.BATCH_KEY],
+                self.mmd_mode,
+            )
+        else:
+            mmd_loss = 0
+
+        loss = torch.mean(reconst_loss + weighted_kl_local) + self.beta * mmd_loss
 
         return LossOutput(
             loss=loss,
@@ -569,6 +591,7 @@ class VAE(EmbeddingModuleMixin, BaseMinifiedModeModuleClass):
                 MODULE_KEYS.KL_L_KEY: kl_divergence_l,
                 MODULE_KEYS.KL_Z_KEY: kl_divergence_z,
             },
+            extra_metrics={"mmd": mmd_loss},
         )
 
     @torch.inference_mode()
@@ -702,6 +725,90 @@ class VAE(EmbeddingModuleMixin, BaseMinifiedModeModuleClass):
         else:
             batch_log_lkl = batch_log_lkl.cpu()
         return batch_log_lkl
+
+    def gaussian_kernel(
+        self,
+        x: torch.Tensor,
+        y: torch.Tensor,
+    ) -> torch.Tensor:
+        """Compute gaussian kernel between every pair of samples from x and y.
+
+        Method based on compute_kernel method from https://github.com/napsternxg/pytorch-practice/blob/master/Pytorch%20-%20MMD%20VAE.ipynb
+        """
+        x_expanded = x.unsqueeze(1)
+        y_expanded = y.unsqueeze(0)
+        x_expanded = x_expanded.expand(x.shape[0], y.shape[0], x.size(dim=1))
+        y_expanded = y_expanded.expand(x.shape[0], y.shape[0], x.size(dim=1))
+        diff = x_expanded - y_expanded
+        return torch.exp(-torch.linalg.vector_norm(diff, dim=2).pow(2))
+
+    def kernel_fast(
+        self,
+        x: torch.Tensor,
+        y: torch.Tensor,
+    ) -> torch.Tensor:
+        """Compute vectorized gaussian kernel, evaluated at corresponding samples in x and y"""
+        return torch.exp(-torch.linalg.vector_norm(x - y, dim=1).pow(2))
+
+    def _compute_mmd(
+        self,
+        z1: torch.Tensor,
+        z2: torch.Tensor,
+    ) -> int:
+        """Compute the mmd for two sets of samples"""
+        return (
+            self.gaussian_kernel(z1, z1).mean()
+            - 2 * self.gaussian_kernel(z1, z2).mean()
+            + self.gaussian_kernel(z2, z2).mean()
+        )
+
+    def _compute_fast_mmd(
+        self,
+        z1: torch.Tensor,
+        z2: torch.Tensor,
+    ) -> int:
+        """Compute fast approximation of mmd for two sets of samples"""
+        m = min(z1.size(dim=0), z2.size(dim=0))
+        m2 = m // 2
+
+        if m2 == 0:
+            return 0
+
+        m = m2 * 2  # We want an even number of cells
+        # only use the first m samples of each batch,
+        # where m is the number of samples in the smaller batch
+        z1 = z1[:m]
+        z2 = z2[:m]
+
+        z1_even, z1_odd = z1[::2], z1[1::2]  # samples at odd and even indices
+        z2_even, z2_odd = z2[::2], z2[1::2]
+
+        h = (
+            self.kernel_fast(z1_even, z1_odd)
+            + self.kernel_fast(z2_even, z2_odd)
+            - self.kernel_fast(z1_even, z2_odd)
+            - self.kernel_fast(z1_odd, z2_even)
+        )
+        return h.mean()
+
+    def _compute_mmd_loss(
+        self,
+        z: torch.Tensor,
+        batch_indices: torch.Tensor,
+        mode: Literal["normal", "fast"],
+    ) -> torch.Tensor:
+        """Compute the mmd loss, only computing the mmd between sequential batches"""
+        batches = torch.unique(batch_indices)
+        mmd_loss = 0
+        for batch_0, batch_1 in zip(batches, batches[1:]):
+            z_0 = z[(batch_indices == batch_0).reshape(-1)]
+            z_1 = z[(batch_indices == batch_1).reshape(-1)]
+            if mode == "normal":
+                mmd_loss += self._compute_mmd(z_0, z_1)
+            elif mode == "fast":
+                mmd_loss += self._compute_fast_mmd(z_0, z_1)
+
+        return mmd_loss
 
 
 class LDVAE(VAE):
